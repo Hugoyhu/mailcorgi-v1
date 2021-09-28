@@ -1,0 +1,1 @@
+PLEASE note this folder contains testing scripts used to try out Shippo's API. No files in here are meant to be used as a standalone, as it will be a pain for you to use, but if you hate yourself, you can stil try.
