@@ -25,15 +25,12 @@ sorted_dict = {}
 service_list = []
 serviceListRaw = []
 for shipser in range(len(rawRates)):
-    print(shipser)
     service = rawRates[shipser]
-    print(service)
     service_list.append(float(rawRates[shipser]["amount"]))
     serviceListRaw.append(service)
 
 returnServices = []
 priceList = sorted(service_list)
-print(priceList)
 for price in priceList:
     price = str(price)
     for service in serviceListRaw:
