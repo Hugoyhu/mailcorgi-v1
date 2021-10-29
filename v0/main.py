@@ -1,26 +1,39 @@
-# TODO: add /add-leader, and other utility commands
-
-import os, logging, supabaseAddress, re
+import os, logging, re
 # Use the package we installed
 from slack_bolt import App
+import purchase, supabaseAddress
+import label
 
 logging.basicConfig(level=logging.DEBUG)
+
+mailChannelID = ""
 # Initializes your app with your bot token and signing secret
+botToken = os.environ.get("SLACK_BOT_TOKEN")
+signingSec = os.environ.get("SLACK_SIGNING_SECRET")
+app = App(token=botToken, signing_secret=signingSec)
 
-app = App(token="",
-          signing_secret="")
-
+# create supabaseaddress address instnace
+sba = supabaseAddress.Address()
 
 @app.command("/send-envelope")
 def envelope(ack, client, command):
     ack()
 
     postText = ""
-    if command["text"] != "": 
-      user = ""
-      try:
+    if command["text"][0:3] == "<@U": 
+        user = ""
+    
         user = re.search("<@(U.+?)\|.+>", command["text"].split(" ")[0]).group(1)
-        address = supabaseAddress.address_uid(str(user))
+        if sba.leaders(command['user_id']) == False:
+          threadText = "well give me a chewtoy an' tell me it's rawhide. you aren't a leader! *angry bjork*"
+          app.client.chat_postEphemeral(
+            channel=command['channel_id'],
+            text=threadText,
+            user=command['user_id']
+          )
+          return
+
+        address = sba.address_uid(uid=str(user))
         postText = f'''
 :rotating_light: MISSION ALERT :rotating_light:
 Sticker Envelope for {address['name']} ({command['text'].split(" ")[0]})
@@ -35,21 +48,134 @@ City: {address['city']}
 State/Province: {address['state']}
 Postal Code: {address['zip']} 
 Country: {address['country']}```
+React with :thumbsup: to accept, :white_check_mark: to purchase, :moneybag: for manual purchase + label, :x: to drop, and :question: to request address.
 '''
-        results =  app.client.chat_postMessage(channel="C02GDBTKY4E", text=postText)
-        supabaseAddress.addOrder(command['user_id'], user, "sticker_envelope", results['ts'])
+        results =  app.client.chat_postMessage(channel=mailChannelID, text=postText)
+        sba.addOrder(command['user_id'], user, "sticker_envelope", results['ts'])
+
+    else:
+      postText = "Please retry with a valid user's Slack tag."
+
+    if len(address['uid']) == 0:
+      sba.insertAddress("", user, "", "", "", "", "", "")
+    
+@app.command("/add-leader")
+def envelope(ack, client, command):
+    ack()
+
+
+    postText = ""
+    if command["text"] != "": 
+
+      user = ""
+      if sba.admins(command['user_id']) == False:
+        results =  app.client.chat_postEphemeral(
+          channel=command['channel_id'], 
+          text="You're not an admin! *angry bjork*",
+          user=command['user_id']
+        )
+        return
+      
+      try:
+        user = re.search("<@(U.+?)\|.+>", command["text"].split(" ")[0]).group(1)
+        sba.addLead(user)
+      
+        postText = "Leader added!"
+        
+        app.client.chat_postEphemeral(
+          channel=command['channel_id'], 
+          text=postText,
+          user=command['user_id']
+        )
+
       except AttributeError:
         postText = "Please retry with a valid user's Slack tag." 
     else:
-      postText = "Please retry with a valid user's Slack tag."
+      postText = "Add"
+
+  
     
-    print(command)
- 
+  
 # listen for react
 
 @app.event("reaction_added")
-def handle_reaction_added_events(body, logger):
-    logger.info(body)
+def handle_reaction_added_events(body, client, logger):
+  msg_ts = body['event']['item']['ts']
+
+  threadText = ""
+
+  nodemasterID = body['event']['user']
+  if sba.nodemasters(nodemasterID) == False:
+    threadText = "well give me a chewtoy an' tell me it's rawhide. you aren't a node master! *angry bjork*"
+    app.client.chat_postMessage(
+      channel=mailChannelID,
+      thread_ts=msg_ts,
+      text=threadText,
+    )
+  address = sba.address_uid(ts=msg_ts)
+
+  rects = body['event']['item']['ts']
+  recUID = sba.getOrderTo(rects)
+  
+  # create Purchase class instance
+  # purchase = Purchase{}
+  if body['event']['reaction'] == "+1":
+    threadText="Mission accepted, DM'd to recepient"
+    app.client.chat_postMessage(
+      channel=recUID,
+      text=f"Hi there! <@{nodemasterID}> has accepted your mail order. Please DM them if you have any inquiries."
+    )
+  elif body['event']['reaction'] == "x":
+    threadText="Mission Dropped"
+  elif body['event']['reaction'] == "white_check_mark":
+    app.client.chat_postMessage(
+      channel=mailChannelID,
+      thread_ts=msg_ts,
+      text="Purchase Requested",
+    )
+    # purchase cheapest shipping label
+    # create Purchase class instance
+    purchaseLabel = purchase.Purchase(nodemasterID, recUID, "sticker_box_200")
+    threadText = purchaseLabel.buy()
+    
+  elif body['event']['reaction'] == "moneybag":
+    # generate pdf
+    fileName = label.labelPDF(nodemasterID, recUID, "0")
+    try:
+      response = app.client.files_upload(
+        channels=mailChannelID,
+        initial_comment="PDF upload",
+        file=f"./{fileName}",
+        thread_ts=msg_ts
+
+      )
+    except:
+      logger.error("Error uploading file")
+
+    os.system("rm *.pdf")
+
+  elif body['event']['reaction'] == "question":
+    # send a dm to user asking to run /updateaddress
+    
+    threadText="Address Requested"
+
+    app.client.chat_postMessage(
+      channel=recUID,
+      text=f"Hi there! <@{nodemasterID}> needs to send you something in the mail: please use /address to update your address!"
+    )
+
+  app.client.chat_postMessage(
+    channel=mailChannelID,
+    thread_ts=msg_ts,
+    text=threadText,
+  )
+  logger.info(body)
+
+def shippingModal():
+  pass
+      
+  
+
 
 @app.middleware  # or app.use(log_request)
 def log_request(logger, body, next):
@@ -131,6 +257,7 @@ def handle_command(body, ack, client, logger):
               {
                   "type": "input",
                   "block_id": "addr2",
+                  "optional": True,
                   "element": {
                       "type": "plain_text_input",
                       "action_id": "plain_text_input-action"
@@ -189,7 +316,7 @@ def handle_command(body, ack, client, logger):
                   },
                   "label": {
                       "type": "plain_text",
-                      "text": "Country",
+                      "text": "2 Letter Country Code(ex. US, CA, UK)",
                       "emoji": True
                   }
               },
@@ -199,8 +326,9 @@ def handle_command(body, ack, client, logger):
   logger.info(res)
 
 
+
 @app.view("address-modal")
-def handle_view_events(ack, body, logger):
+def handle_view_events(ack, body):
   """
   Step 4: 
   The path that allows for your server to receive information from the modal sent in Slack
@@ -218,10 +346,26 @@ def handle_view_events(ack, body, logger):
   zipcode = value("zip") 
   country = value("country")
 
-  supabaseAddress.insertAddress(name, uid, addr1, addr2, city, state, zipcode, country)
-  logger.info(body["view"]["state"]["values"])
+  sba.insertAddress(name, uid, addr1, addr2, city, state, zipcode, country)
 
+  orders = sba.getOrders(uid)
 
+  for order in range(len(orders)):
+    app.client.chat_postMessage(
+      channel=mailChannelID,
+      thread_ts=orders[order]['message_id'],
+      text=f'''
+This address was just updated! Here's what we received:
+```
+Name: {name}
+Street (First Line): {addr1}
+Street (Second Line): {addr2}
+City: {city}
+State/Province: {state}
+Postal Code: {zipcode} 
+Country: {country}```
+      ''',
+    )
 # Start your app
 if __name__ == "__main__":
     app.start(port=int(os.environ.get("PORT", 3000)))
