@@ -55,12 +55,9 @@ class Address:
 
     returnList = []
     for i in range(len(recordList)):
-      print(recordList[i]['uid'])
       if recordList[i]['uid'] == uid:
-        print("finally")
         returnList.append(recordList[i])
       
-    print(returnList)
     returnListCounter = 0
     for i in range(len(returnList)):
       if returnList[i]['name'] != "":
@@ -71,7 +68,7 @@ class Address:
           return {"name": "", "uid": uid, "addr1": "", "addr2": "", "city": "", "state": "", "zip": "", "country": ""}
 
     if len(returnList) == 0:
-      return
+      return {"name": "", "uid": uid, "addr1": "", "addr2": "", "city": "", "state": "", "zip": "", "country": ""}
       
     largerRecord = None
 
@@ -127,11 +124,15 @@ class Address:
 
   def getOrders(self, uid):
     data = self.supabase.table("orders").select("shipto_uid, message_id").execute()
-    if len(data['data']) > 3:
-      dataList = data['data'][len(data['data'])-3:len(data['data'])]
-    else:
-      dataList = data['data']
     
+    dataList = []
+    for i in range(len(data['data'])):
+      if data['data'][i]['shipto_uid'] == uid:
+        dataList.append(data['data'][i])
+    if len(dataList) > 3:
+      dataList = dataList[len(dataList)-3:len(dataList)]
+    else:
+      dataList = dataList
     return dataList
 
   def getOrderTo(self, ts):

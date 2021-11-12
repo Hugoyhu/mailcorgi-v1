@@ -1,8 +1,6 @@
-import os, logging, re
+import os, logging, re, time
 # Use the package we installed
 from slack_bolt import App
-import purchase, supabaseAddress
-import label
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -12,6 +10,13 @@ botToken = os.environ.get("SLACK_BOT_TOKEN")
 signingSec = os.environ.get("SLACK_SIGNING_SECRET")
 app = App(token=botToken, signing_secret=signingSec)
 
+os.system("pip install supabase_py")
+time.sleep(10)
+os.system("pip uninstall -y dataclasses")
+time.sleep(5)
+
+import supabaseAddress
+import label
 # create supabaseaddress address instnace
 sba = supabaseAddress.Address()
 
@@ -34,7 +39,26 @@ def envelope(ack, client, command):
           return
 
         address = sba.address_uid(uid=str(user))
-        postText = f'''
+        
+        if len(address) ==0:
+          postText = f'''
+:rotating_light: MISSION ALERT :rotating_light:
+Requested by <@{command['user_id']}>
+Sticker Envelope for {command['text'].split(" ")[0]}
+Here's what's in a Sticker Envelope:
+- 10 Assorted Stickers 
+And here's our address data:
+```
+Name: {command['text'].split(" ")[0]}
+Street (First Line): 
+Street (Second Line): 
+City: 
+State/Province:
+Postal Code: 
+Country:```
+React with :thumbsup: to accept, :moneybag: for manual purchase + label, :x: to drop, and :question: to request address.'''
+        else:
+          postText = f'''
 :rotating_light: MISSION ALERT :rotating_light:
 Sticker Envelope for {address['name']} ({command['text'].split(" ")[0]})
 Here's what's in a Sticker Envelope:
@@ -48,7 +72,7 @@ City: {address['city']}
 State/Province: {address['state']}
 Postal Code: {address['zip']} 
 Country: {address['country']}```
-React with :thumbsup: to accept, :white_check_mark: to purchase, :moneybag: for manual purchase + label, :x: to drop, and :question: to request address.
+React with :thumbsup: to accept, :moneybag: for manual purchase + label, :x: to drop, and :question: to request address.
 '''
         results =  app.client.chat_postMessage(channel=mailChannelID, text=postText)
         sba.addOrder(command['user_id'], user, "sticker_envelope", results['ts'])
@@ -58,7 +82,70 @@ React with :thumbsup: to accept, :white_check_mark: to purchase, :moneybag: for 
 
     if len(address['uid']) == 0:
       sba.insertAddress("", user, "", "", "", "", "", "")
+
+@app.command("/send-box")
+def box(ack, client, command):
+    ack()
+
+    postText = ""
+    if command["text"][0:3] == "<@U": 
+        user = ""
     
+        user = re.search("<@(U.+?)\|.+>", command["text"].split(" ")[0]).group(1)
+        if sba.leaders(command['user_id']) == False:
+          threadText = "well give me a chewtoy an' tell me it's rawhide. you aren't a leader! *angry bjork*"
+          app.client.chat_postEphemeral(
+            channel=command['channel_id'],
+            text=threadText,
+            user=command['user_id']
+          )
+          return
+
+        address = sba.address_uid(uid=str(user))
+        
+        if len(address) ==0:
+          postText = f'''
+:rotating_light: MISSION ALERT :rotating_light:
+Requested by <@{command['user_id']}>
+Sticker Box for {command['text'].split(" ")[0]}
+Here's what's in a Sticker Box:
+- 200 Assorted Stickers, 4 designs(bundles of 50)
+And here's our address data:
+```
+Name: {command['text'].split(" ")[0]}
+Street (First Line): 
+Street (Second Line): 
+City: 
+State/Province:
+Postal Code: 
+Country:```
+React with :thumbsup: to accept, :moneybag: for manual purchase + label, :x: to drop, and :question: to request address.'''
+        else:
+          postText = f'''
+:rotating_light: MISSION ALERT :rotating_light:
+Sticker Box for {address['name']} ({command['text'].split(" ")[0]})
+Here's what's in a Sticker Box:
+- 200 Assorted Stickers, 4 designs(bundles of 50)
+And here's our address data:
+```
+Name: {address['name']}
+Street (First Line): {address['addr1']}
+Street (Second Line): {address['addr2']}
+City: {address['city']}
+State/Province: {address['state']}
+Postal Code: {address['zip']} 
+Country: {address['country']}```
+React with :thumbsup: to accept, :moneybag: for manual purchase + label, :x: to drop, and :question: to request address.
+'''
+        results =  app.client.chat_postMessage(channel=mailChannelID, text=postText)
+        sba.addOrder(command['user_id'], user, "sticker_box", results['ts'])
+
+    else:
+      postText = "Please retry with a valid user's Slack tag."
+
+    if len(address['uid']) == 0:
+      sba.insertAddress("", user, "", "", "", "", "", "")
+
 @app.command("/add-leader")
 def envelope(ack, client, command):
     ack()
@@ -120,23 +207,23 @@ def handle_reaction_added_events(body, client, logger):
   # create Purchase class instance
   # purchase = Purchase{}
   if body['event']['reaction'] == "+1":
-    threadText="Mission accepted, DM'd to recepient"
+    threadText=f"Mission accepted by <@{nodemasterID}>, DM'd to recepient"
     app.client.chat_postMessage(
       channel=recUID,
       text=f"Hi there! <@{nodemasterID}> has accepted your mail order. Please DM them if you have any inquiries."
     )
   elif body['event']['reaction'] == "x":
     threadText="Mission Dropped"
-  elif body['event']['reaction'] == "white_check_mark":
-    app.client.chat_postMessage(
-      channel=mailChannelID,
-      thread_ts=msg_ts,
-      text="Purchase Requested",
-    )
+  #elif body['event']['reaction'] == "white_check_mark":
+    #app.client.chat_postMessage(
+      #channel=mailChannelID,
+      #thread_ts=msg_ts,
+      #text="Purchase Requested",
+    #)
     # purchase cheapest shipping label
     # create Purchase class instance
-    purchaseLabel = purchase.Purchase(nodemasterID, recUID, "sticker_box_200")
-    threadText = purchaseLabel.buy()
+    #purchaseLabel = purchase.Purchase(nodemasterID, recUID, "sticker_box_200")
+    #threadText = purchaseLabel.buy()
     
   elif body['event']['reaction'] == "moneybag":
     # generate pdf
@@ -161,7 +248,7 @@ def handle_reaction_added_events(body, client, logger):
 
     app.client.chat_postMessage(
       channel=recUID,
-      text=f"Hi there! <@{nodemasterID}> needs to send you something in the mail: please use /address to update your address!"
+      text=f"Hi there! <@{nodemasterID}> needs to send you something in the mail: please use /addressupdate to update your address!"
     )
 
   app.client.chat_postMessage(
@@ -290,7 +377,7 @@ def handle_command(body, ack, client, logger):
                   },
                   "label": {
                       "type": "plain_text",
-                      "text": "State",
+                      "text": "State/Province",
                       "emoji": True
                   }
               },
@@ -303,7 +390,7 @@ def handle_command(body, ack, client, logger):
                   },
                   "label": {
                       "type": "plain_text",
-                      "text": "Zip Code",
+                      "text": "Zip/Pincode",
                       "emoji": True
                   }
               },
@@ -316,7 +403,7 @@ def handle_command(body, ack, client, logger):
                   },
                   "label": {
                       "type": "plain_text",
-                      "text": "2 Letter Country Code(ex. US, CA, UK)",
+                      "text": "Country",
                       "emoji": True
                   }
               },
@@ -348,8 +435,12 @@ def handle_view_events(ack, body):
 
   sba.insertAddress(name, uid, addr1, addr2, city, state, zipcode, country)
 
+  app.client.chat_postMessage(
+      channel=uid,
+      text=f"Thank you for filling out and updating your address. Your new address should be logged and sent to Mail Team within 5 seconds of this message."
+    )
+  print(uid)
   orders = sba.getOrders(uid)
-
   for order in range(len(orders)):
     app.client.chat_postMessage(
       channel=mailChannelID,
