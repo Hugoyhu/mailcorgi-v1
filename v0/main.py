@@ -278,7 +278,8 @@ def handle_command(body, ack, client, logger):
   """
   
   ack()
-  logger.info(body)
+  print(body)
+  address = sba.address_uid(body['user_id'])
 
   res = client.views_open(
       trigger_id=body["trigger_id"],
@@ -320,7 +321,8 @@ def handle_command(body, ack, client, logger):
                   "block_id": "name",
                   "element": {
                       "type": "plain_text_input",
-                      "action_id": "plain_text_input-action"
+                      "action_id": "plain_text_input-action",
+                      "initial_value": address['name']
                   },
                   "label": {
                       "type": "plain_text",
@@ -333,6 +335,7 @@ def handle_command(body, ack, client, logger):
                   "block_id": "addr1",
                   "element": {
                       "type": "plain_text_input",
+                      "initial_value": address['addr1'],
                       "action_id": "plain_text_input-action"
                   },
                   "label": {
@@ -347,6 +350,7 @@ def handle_command(body, ack, client, logger):
                   "optional": True,
                   "element": {
                       "type": "plain_text_input",
+                      "initial_value": address['addr2'],
                       "action_id": "plain_text_input-action"
                   },
                   "label": {
@@ -360,6 +364,7 @@ def handle_command(body, ack, client, logger):
                   "block_id": "city",
                   "element": {
                       "type": "plain_text_input",
+                      "initial_value": address['city'],
                       "action_id": "plain_text_input-action"
                   },
                   "label": {
@@ -373,6 +378,7 @@ def handle_command(body, ack, client, logger):
                   "block_id": "state",
                   "element": {
                       "type": "plain_text_input",
+                      "initial_value": address['state'],
                       "action_id": "plain_text_input-action"
                   },
                   "label": {
@@ -386,6 +392,7 @@ def handle_command(body, ack, client, logger):
                   "block_id": "zip",
                   "element": {
                       "type": "plain_text_input",
+                      "initial_value": address['zip'],
                       "action_id": "plain_text_input-action"
                   },
                   "label": {
@@ -399,6 +406,7 @@ def handle_command(body, ack, client, logger):
                   "block_id": "country",
                   "element": {
                       "type": "plain_text_input",
+                      "initial_value": address['country'],
                       "action_id": "plain_text_input-action"
                   },
                   "label": {
@@ -437,7 +445,7 @@ def handle_view_events(ack, body):
 
   app.client.chat_postMessage(
       channel=uid,
-      text=f"Thank you for filling out and updating your address. Your new address should be logged and sent to Mail Team within 5 seconds of this message."
+      text=f"Thank you for filling out and updating your address. Your new address should be logged and sent to Mail Team shortly. To verify your address, run /addressupdate again. Your address should be prefilled."
     )
   print(uid)
   orders = sba.getOrders(uid)
