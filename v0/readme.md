@@ -12,8 +12,10 @@ shippo, supabase_py, slack-bolt, and reportlab.
 
 Early on, I discovered a case where the application had a critical error(don't remember), but uninstall dataclasses, that will fix the issue.
 
-Currently on v0.0.2
-Latest Update: adds sticker box requests 11/11/2021
+supabase has a default address return of 1000. When you have more than that many(I have ~12K), it will not return all and can lead to undefined behavior(record is there, not being found because it's not being returned). To fix, go to your project dashboard > Settings > API > Record Return #. This is still pretty fast
+
+Currently on v0.0.3
+Latest Update: adds address modal prefill 11/12/2021
 
 
 
