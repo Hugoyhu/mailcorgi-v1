@@ -12,5 +12,8 @@ shippo, supabase_py, slack-bolt, and reportlab.
 
 Early on, I discovered a case where the application had a critical error(don't remember), but uninstall dataclasses, that will fix the issue.
 
+Currently on v0.0.2
+Latest Update: adds sticker box requests 11/11/2021
+
 
 
