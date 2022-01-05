@@ -310,7 +310,7 @@ def handle_command(body, ack, client, logger):
                       "type":
                       "mrkdwn",
                       "text":
-                      "Hello! PLease use this form to update the Address you have with Hack Club and MailCorgi."
+                      "Hello! Please use this form to update the address you have with Hack Club and MailCorgi."
                   }
               },
               {
